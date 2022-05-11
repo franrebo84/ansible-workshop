@@ -1,0 +1,20 @@
+[synchro]
+podman ansible_host=192.168.70.16 ansible_user=root
+
+
+[zabbix]
+centos6 ansible_host=192.168.70.251 
+centos7 ansible_host=192.168.70.250 
+centos8 ansible_host=192.168.70.16 
+debian9 ansible_host=192.168.70.244
+debian10 ansible_host=192.168.70.245
+ubuntu14 ansible_host=192.168.70.242
+ubuntu16 ansible_host=192.168.70.241
+ubuntu18 ansible_host=192.168.70.240
+
+[zabbix:vars]
+ansible_user=root
+ansible_ssh_pass=root
+
+
+

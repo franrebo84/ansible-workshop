@@ -1,0 +1,121 @@
+---
+- hosts: all
+  become: yes
+  vars:
+    - homeDir: /home/node/
+    - appDir : app
+    - repo: git@github.com:franrebo84/nodeapp-demo.git
+    - privateKey: .ssh/id_rsa
+    - port: 8080
+
+
+  tasks:
+  - name: Install Packages
+    package: 
+      name: "{{ item }}"
+      state: latest
+    with_items:
+      - npm
+      - nodejs
+      - git
+      - nginx
+      - curl
+      - vim
+      - policycoreutils-python-utils
+
+  - name: Create node user
+    user:
+      name: node
+      state: present
+      createhome: yes
+
+  - name: Set up authorized keys for the deployer user
+    authorized_key: 
+      user: node
+      key: "{{item}}"
+    with_file:
+      - ~/.ssh/id_rsa.pub 
+
+  - name: Install pm2
+    npm: 
+      name: pm2 
+      global: yes 
+      production: yes
+  - name: Copy key file for git
+    copy:
+      src: .ssh/id_rsa
+      dest: "{{ homeDir }}/.ssh/id_rsa_git"
+      mode: 0600
+      owner: node
+      group: node
+
+  - name: Create APP Directory
+    file: 
+      path: "{{ homeDir }}/{{ appDir }}"
+      state: directory
+      owner: node
+      group: node
+
+  - name: copy default config from nginx.conf
+    copy:
+      src: config_files/nginx.conf
+      dest: /etc/nginx/nginx.conf
+      backup: yes
+
+  - name: Set the default site to redirect to :8080
+    copy:
+      src: config_files/default_site.conf
+      dest: /etc/nginx/conf.d/default_site.conf
+      backup: yes
+
+  - name: permit traffic in default zone for https service
+    firewalld:
+      service: http
+      permanent: yes
+      immediate: yes
+      state: enabled
+
+  - name: Set httpd_can_network_connect flag on and keep it persistent across reboots
+    ansible.posix.seboolean:
+      name: httpd_can_network_connect
+      state: yes
+      persistent: yes
+
+  - name: restart nginx
+    service:
+      name: nginx
+      state: restarted
+    
+  - name: Git Clone Repo
+    become_user: node
+    git: 
+      repo: "{{ repo }}"
+      dest: "{{ homeDir }}/{{ appDir }}"
+      update: yes 
+      force: yes 
+      accept_hostkey: yes 
+      key_file: "{{ homeDir }}/.ssh/id_rsa_git"
+    register: git_finished
+
+  - name: Running NPM install
+    npm: path={{homeDir}}/{{appDir}}/
+    register: npm_finished
+    when: git_finished.changed
+
+  - name: Stop APP
+    become_user: node
+    shell:
+      cmd: /usr/local/bin/pm2 stop apa
+      chdir: "{{homeDir}}/{{appDir}}"
+    ignore_errors: yes
+    when: git_finished.changed
+
+  - name: Start APP
+    become_user: node
+    shell:
+      cmd: /usr/local/bin/pm2 start index.js --name apa
+      chdir: "{{homeDir}}/{{appDir}}/"
+    when: git_finished.changed
+#    when: npm_finished.changed
+
+  

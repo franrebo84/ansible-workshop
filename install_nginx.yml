@@ -1,0 +1,56 @@
+---
+- hosts: all
+  become: true
+  connection: ssh 
+
+  tasks:
+  - name: Install nginx
+    apt: 
+      name: nginx
+      state: latest
+    when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+  - name: restart nginx
+    service: 
+      name: nginx 
+      state: started 
+      enabled: yes
+    when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+  - name: Install nginx
+    yum: 
+      name: nginx
+      state: latest
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - firewalld:
+      service: https
+      permanent: yes
+      state: enabled
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - firewalld:
+     zone: public
+     service: http
+     permanent: yes
+     state: enabled
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: Bounce firewalld
+    service:
+      name: firewalld
+      state: restarted
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+
+  - name: restart nginxd
+    service: 
+      name: nginx 
+      state: started 
+      enabled: yes
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: install (or upgrade to) the latest version of htop
+    package: 
+      name: htop 
+      state: latest
